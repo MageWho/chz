@@ -1,5 +1,7 @@
 import os
 import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -38,7 +40,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     profile = load_profile()
 
-    # Simple learning (you can expand this later)
     lower = user_text.lower()
     if "my name is" in lower or "i am" in lower or "i'm" in lower:
         profile["intro"] = user_text
@@ -50,7 +51,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         profile["last_message"] = user_text
 
     save_profile(profile)
-
     await update.message.reply_text("Noted. I'll remember that.")
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -59,7 +59,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "but I saved that you sent one. You can describe it in text for now."
     )
 
-def main():
+def run_bot():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("profile", profile))
@@ -68,5 +68,20 @@ def main():
     print("Bot is running...")
     app.run_polling()
 
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+def run_web():
+    port = int(os.getenv("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    print(f"Health check server running on port {port}")
+    server.serve_forever()
+
 if __name__ == "__main__":
-    main()
+    # Start the bot in a background thread
+    threading.Thread(target=run_bot, daemon=True).start()
+    # Start the web server (so Render is happy)
+    run_web()
