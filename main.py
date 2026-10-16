@@ -1,7 +1,8 @@
 import os
 import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import asyncio
 import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -65,6 +66,10 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"OK")
 
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
 def run_web():
     port = int(os.getenv("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), HealthHandler)
@@ -72,15 +77,22 @@ def run_web():
     server.serve_forever()
 
 def main():
-    # Start the health-check web server in a background thread
+    # Start health check server in background
     threading.Thread(target=run_web, daemon=True).start()
 
-    # Run the Telegram bot in the main thread
+    # Fix for the event loop error
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("profile", profile))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))
+
     print("Bot is running...")
     app.run_polling()
 
