@@ -59,15 +59,6 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "but I saved that you sent one. You can describe it in text for now."
     )
 
-def run_bot():
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("profile", profile))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.add_handler(MessageHandler(filters.VOICE, handle_voice))
-    print("Bot is running...")
-    app.run_polling()
-
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -80,8 +71,18 @@ def run_web():
     print(f"Health check server running on port {port}")
     server.serve_forever()
 
+def main():
+    # Start the health-check web server in a background thread
+    threading.Thread(target=run_web, daemon=True).start()
+
+    # Run the Telegram bot in the main thread
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("profile", profile))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.VOICE, handle_voice))
+    print("Bot is running...")
+    app.run_polling()
+
 if __name__ == "__main__":
-    # Start the bot in a background thread
-    threading.Thread(target=run_bot, daemon=True).start()
-    # Start the web server (so Render is happy)
-    run_web()
+    main()
